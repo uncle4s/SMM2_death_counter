@@ -9,14 +9,11 @@ DEATH_FRAME_NUM = 115  # マリオが死んだ際に発生する真っ黒の画�
 THRESHOLD = 10  # 真っ黒とみなすピクセル値の閾値
 BLACK_RATIO = 0.99  # 画面が真っ黒と判定する割合 (BLACK_RATIO*100 %以上が黒)
 
-WIDTH = 1920 #switchの解像度
-HEIGHT = 1080
-
 input_source = cv2.VideoCapture(DEVICE_ID) #映像の取得
 
 input_source.set(cv2.CAP_PROP_FPS, 30) #画面設定
-input_source.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-input_source.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT) 
+input_source.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+input_source.set(cv2.CAP_PROP_FRAME_HEIGHT, 720) 
 
 
 
@@ -30,8 +27,8 @@ def main():
             if check_black_screen(frame):
                 blackFrameCout += 1
             else:
-                if blackFrameCout >= DEATH_FRAME_NUM and blackFrameCout <= DEATH_FRAME_NUM + 3: #死亡判定(DEATH_FRAME_NUMフレーム連続で真っ黒の画面が検出されたら)    
-                    print("death detected")
+                if blackFrameCout >=10: #死亡判定(DEATH_FRAME_NUMフレーム連続で真っ黒の画面が検出されたら)    
+                    print(blackFrameCout)
                     blackFrameCout = 0
                 blackFrameCout = 0
                 
@@ -43,14 +40,11 @@ def get_frame(): #画像の取得
         print("failed to open camera")
         exit()
 
-    ret, frame_origin = input_source.read()
+    ret, frame = input_source.read()
     if not ret:
         print("failed to get frame")
         exit()
 
-    x, y = 0, 0 # トリミングする座標
-    h, w =  HEIGHT-106, WIDTH-188 # トリミングするサイズ
-    frame = frame_origin[y:y+h, x:x+w]
     cv2.imshow("input_source", frame)
     cv2.waitKey(1)
     return frame
