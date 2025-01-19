@@ -5,8 +5,8 @@ import numpy as np
 DEVICE_ID = 4 #仮想カメラのID
 
 # パラメータ設定
-DEATH_FRAME_NUM = 115  # マリオが死んだ際に発生する真っ黒の画面が連続するフレーム数
-THRESHOLD = 10  # 真っ黒とみなすピクセル値の閾値
+DEATH_FRAME_NUM = 124  # マリオが死んだ際に発生する真っ黒の画面が連続するフレーム数
+THRESHOLD = 20  # 真っ黒とみなすピクセル値の閾値
 BLACK_RATIO = 0.99  # 画面が真っ黒と判定する割合 (BLACK_RATIO*100 %以上が黒)
 
 WIDTH = 1920 #switchの解像度
@@ -27,12 +27,14 @@ def main():
             break
         else:
             frame = get_frame()
-            if check_black_screen(frame):
+            if is_black_screen(frame):
                 blackFrameCout += 1
+                print(blackFrameCout)
             else:
                 if blackFrameCout >= DEATH_FRAME_NUM and blackFrameCout <= DEATH_FRAME_NUM + 3: #死亡判定(DEATH_FRAME_NUMフレーム連続で真っ黒の画面が検出されたら)    
-                    print("death detected")
-                    blackFrameCout = 0
+                    prev_death_count = read_death_count() #死亡回数の読み込み
+                    write_death_count(prev_death_count) #死亡回数の書き込み
+                    print("death")
                 blackFrameCout = 0
                 
 
@@ -48,19 +50,18 @@ def get_frame(): #画像の取得
         print("failed to get frame")
         exit()
 
-    x, y = 0, 0 # トリミングする座標
-    h, w =  HEIGHT-106, WIDTH-188 # トリミングするサイズ
-    frame = frame_origin[y:y+h, x:x+w]
+    x, y = 265, 71 # トリミングする座標
+    h, w =  HEIGHT-90, WIDTH-20 # トリミングするサイズ
+    frame = frame_origin[y:h, x:w]
     cv2.imshow("input_source", frame)
     cv2.waitKey(1)
     return frame
 
 
 
-def check_black_screen(frame): #真っ黒の画面かどうかの判定
+def is_black_screen(frame): #真っ黒の画面かどうかの判定
     # フレームをグレースケールに変換
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
     # 黒いピクセルの割合を計算
     black_pixels = np.sum(gray < THRESHOLD)
     total_pixels = gray.size
@@ -71,10 +72,25 @@ def check_black_screen(frame): #真っ黒の画面かどうかの判定
     else:
         return False
 
+def read_death_count():
+    try:
+        with open("death_count.txt", "r") as file:
+            death_count = int(file.read())
+    except FileNotFoundError:
+        death_count = 0
+    return death_count
+
+
+def write_death_count(prev_death_count):
+    with open("death_count.txt", "w") as file:
+        file.write(str(prev_death_count + 1))
+
+
 
 if __name__ == "__main__":
     main()
 
+    input_source.release()
+    cv2.destroyAllWindows()
 
-input_source.release()
-cv2.destroyAllWindows()
+
