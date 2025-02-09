@@ -1,20 +1,24 @@
+from graphlib import TopologicalSorter
+from logging import NullHandler
+import re
 import cv2
 import keyboard
 import numpy as np
+import pytesseract
 
-DEVICE_ID = 4 #仮想カメラのID
+DEVICE_ID = 2 #仮想カメラのID
 
 # パラメータ設定
-DEATH_FRAME_NUM = 124  # マリオが死んだ際に発生する真っ黒の画面が連続するフレーム数
-THRESHOLD = 20  # 真っ黒とみなすピクセル値の閾値
-BLACK_RATIO = 0.99  # 画面が真っ黒と判定する割合 (BLACK_RATIO*100 %以上が黒)
+DEATH_FRAME_NUM = 8  # 马里奥死亡时出现的黑色画面连续帧数
+THRESHOLD = 20  # 被视为黑色的像素值阈值
+BLACK_RATIO = 0.99  # 屏幕应该判断黑色百分比 (BLACK_RATIO*100 %以上が黒)
 
 WIDTH = 1920 #switchの解像度
 HEIGHT = 1080
 
 input_source = cv2.VideoCapture(DEVICE_ID) #映像の取得
 
-input_source.set(cv2.CAP_PROP_FPS, 30) #画面設定
+input_source.set(cv2.CAP_PROP_FPS, 1)  #画面設定
 input_source.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
 input_source.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT) 
 
@@ -31,13 +35,16 @@ def main():
                 blackFrameCout += 1
                 print(blackFrameCout)
             else:
-                if blackFrameCout >= DEATH_FRAME_NUM and blackFrameCout <= DEATH_FRAME_NUM + 3: #死亡判定(DEATH_FRAME_NUMフレーム連続で真っ黒の画面が検出されたら)    
-                    prev_death_count = read_death_count() #死亡回数の読み込み
-                    write_death_count(prev_death_count) #死亡回数の書き込み
+                if blackFrameCout >= DEATH_FRAME_NUM and blackFrameCout <= DEATH_FRAME_NUM + 3: #死亡判定(DEATH_FRAME_NUM如果检测到连续黑屏帧)
+                    prev_death_count = read_death_count() #总死亡次数增加
+                    write_death_count(prev_death_count) #总死亡次数写入
                     print("death")
                 blackFrameCout = 0
-                
-
+            level_id = read_level_id(frame)
+            if level_id != "" and level_id != None:
+                print(level_id)
+            else:
+                continue
 
 
 def get_frame(): #画像の取得
@@ -50,19 +57,16 @@ def get_frame(): #画像の取得
         print("failed to get frame")
         exit()
 
-    x, y = 265, 71 # トリミングする座標
-    h, w =  HEIGHT-90, WIDTH-20 # トリミングするサイズ
-    frame = frame_origin[y:h, x:w]
-    cv2.imshow("input_source", frame)
+    cv2.imshow("input_source", frame_origin)
     cv2.waitKey(1)
-    return frame
+    return frame_origin
 
 
 
-def is_black_screen(frame): #真っ黒の画面かどうかの判定
-    # フレームをグレースケールに変換
+def is_black_screen(frame): #判断画面是否为黑色
+    # 将框架转换为灰度
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # 黒いピクセルの割合を計算
+    # 计算黑色像素的百分比
     black_pixels = np.sum(gray < THRESHOLD)
     total_pixels = gray.size
     black_ratio = black_pixels / total_pixels
@@ -86,11 +90,58 @@ def write_death_count(prev_death_count):
         file.write(str(prev_death_count + 1))
 
 
+def read_level_id(frame):
+    x, y = 50, 150 # 要裁剪的坐标
+    h, w =  HEIGHT-900, WIDTH-1500 # 要裁剪的尺寸
+    frame = frame[y:h, x:w]
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # 图像预处理：二值化（增强对比度）
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+
+    # 使用 Tesseract 识别
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    text = pytesseract.image_to_string(thresh, lang="eng", config="--psm 6")
+
+    # 提取字母和数字（过滤分隔符）
+    allowed_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-")
+    filtered_text = "".join([c if c in allowed_chars else " " for c in text])
+    cleaned_text = " ".join(filtered_text.replace(" ","").split())
+    pattern = r"^[A-Za-z0-9]{3}-[A-Za-z0-9]{3}-[A-Za-z0-9]{3}$"
+    if re.fullmatch(pattern, cleaned_text):
+        return cleaned_text
+    else:
+        return None
+
+def read_level_id():
+    try:
+        with open("level_id.txt", "r") as file:
+            level_id = int(file.read())
+    except FileNotFoundError:
+        level_id = ""
+    return level_id
+
+
+def write_level_id(prev_level_id):
+    with open("death_count.txt", "w") as file:
+        file.write(str(prev_level_id))
+
+
 
 if __name__ == "__main__":
     main()
 
     input_source.release()
     cv2.destroyAllWindows()
+
+
+#TODO
+'''
+增加了新的功能之后黑屏的帧数变少了很多，需要知道原因
+关卡死亡次数统计，随着关卡id的变化，死亡次数随着id重置，总死亡次数不变。
+关卡id如何放到直播画面中去
+通过的关卡数量统计？不同难度关卡的统计？团长信息 根据这些生成一个图？
+'''
+
 
 
